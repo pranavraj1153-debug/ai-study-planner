@@ -6,8 +6,8 @@ const tasks = [
   {
     id: 1,
     subject: "Data Structures",
-    time: "10:30 - 11:30",
     estimatedMinutes: 90,
+    completedMinutes: 60,
     difficulty: "hard",
     priority: "high",
     completed: false,
@@ -15,8 +15,8 @@ const tasks = [
   {
     id: 2,
     subject: "Database Systems",
-    time: "2:00 - 3:00",
     estimatedMinutes: 60,
+    completedMinutes: 0,
     difficulty: "medium",
     priority: "medium",
     completed: false,
@@ -24,8 +24,8 @@ const tasks = [
   {
     id: 3,
     subject: "Mathematics",
-    time: "4:00 - 4:30",
     estimatedMinutes: 30,
+    completedMinutes: 0,
     difficulty: "easy",
     priority: "low",
     completed: false,
@@ -48,8 +48,8 @@ const exams = [
 const plan = generateStudyPlan(
   tasks,
   exams,
-  2
+  1
 );
 
-console.log("Generated Study Plan:");
+console.log("Generated Adaptive Study Plan:");
 console.table(plan);

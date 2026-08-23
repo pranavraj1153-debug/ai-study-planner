@@ -6,8 +6,6 @@ function getDaysUntilExam(examDate) {
   const today = new Date();
   const exam = new Date(examDate);
 
-  // Remove the time component so comparisons
-  // are consistent.
   today.setHours(0, 0, 0, 0);
   exam.setHours(0, 0, 0, 0);
 
@@ -35,10 +33,6 @@ function findExamForSubject(subject, exams) {
 
 /**
  * Convert difficulty into a numeric score.
- *
- * Hard = highest
- * Medium = middle
- * Easy = lowest
  */
 function getDifficultyScore(difficulty) {
   const scores = {
@@ -64,7 +58,7 @@ function getPriorityScore(priority) {
 }
 
 /**
- * Calculate how urgent an exam is.
+ * Calculate exam urgency.
  *
  * Closer exam = higher score.
  */
@@ -77,7 +71,6 @@ function getExamUrgencyScore(exam) {
     exam.examDate
   );
 
-  // Exam has already passed.
   if (daysUntilExam < 0) {
     return 5;
   }
@@ -102,15 +95,9 @@ function getExamUrgencyScore(exam) {
 }
 
 /**
- * Calculate the total priority score for a task.
- *
- * The score combines:
- * - Exam urgency
- * - Task difficulty
- * - User priority
+ * Calculate total task priority.
  */
 function calculatePriority(task, exams) {
-  // Completed tasks should not be scheduled.
   if (task.completed) {
     return 0;
   }
@@ -137,33 +124,47 @@ function calculatePriority(task, exams) {
 }
 
 /**
- * Generate a study plan.
+ * Calculate how much work is still remaining.
  *
- * @param {Array} tasks
- * @param {Array} exams
- * @param {number} availableHours
- * @returns {Array} prioritized study plan
+ * Example:
+ * estimatedMinutes = 90
+ * completedMinutes = 60
+ *
+ * remainingMinutes = 30
+ */
+function getRemainingMinutes(task) {
+  const estimatedMinutes =
+    Number(task.estimatedMinutes) || 60;
+
+  const completedMinutes =
+    Number(task.completedMinutes) || 0;
+
+  return Math.max(
+    estimatedMinutes - completedMinutes,
+    0
+  );
+}
+
+/**
+ * Generate an adaptive study plan.
  */
 function generateStudyPlan(
   tasks,
   exams,
   availableHours
 ) {
-  // Validate tasks.
   if (!Array.isArray(tasks)) {
     throw new Error(
       "Tasks must be an array"
     );
   }
 
-  // Validate exams.
   if (!Array.isArray(exams)) {
     throw new Error(
       "Exams must be an array"
     );
   }
 
-  // Validate available study time.
   if (
     typeof availableHours !== "number" ||
     !Number.isFinite(availableHours) ||
@@ -174,12 +175,12 @@ function generateStudyPlan(
     );
   }
 
-  // Only unfinished tasks should be planned.
+  // Only unfinished tasks should be considered.
   const incompleteTasks = tasks.filter(
     (task) => !task.completed
   );
 
-  // Add planning information to each task.
+  // Add priority and remaining-work information.
   const prioritizedTasks =
     incompleteTasks.map((task) => {
       const exam =
@@ -196,6 +197,9 @@ function generateStudyPlan(
             task,
             exams
           ),
+
+        remainingMinutes:
+          getRemainingMinutes(task),
 
         daysUntilExam: exam
           ? getDaysUntilExam(
@@ -220,42 +224,44 @@ function generateStudyPlan(
 
   const studyPlan = [];
 
-  let remainingMinutes =
+  let remainingAvailableMinutes =
     availableMinutes;
 
-  // Allocate study time according
-  // to priority.
   for (const task of prioritizedTasks) {
-    if (remainingMinutes <= 0) {
+    if (
+      remainingAvailableMinutes <= 0
+    ) {
       break;
     }
 
-    // Use the estimated task duration.
-    // Fall back to 60 minutes if missing.
-    const taskMinutes =
-      Number(task.estimatedMinutes) || 60;
+    // No remaining work = nothing to schedule.
+    if (task.remainingMinutes <= 0) {
+      continue;
+    }
 
-    // Don't allocate more time than
-    // the student has available.
     const allocatedMinutes =
       Math.min(
-        taskMinutes,
-        remainingMinutes
+        task.remainingMinutes,
+        remainingAvailableMinutes
       );
 
     studyPlan.push({
       taskId: task.id,
       subject: task.subject,
       timeMinutes: allocatedMinutes,
+      remainingMinutes:
+        task.remainingMinutes,
       priorityScore:
         task.priorityScore,
-      difficulty: task.difficulty,
-      priority: task.priority,
+      difficulty:
+        task.difficulty,
+      priority:
+        task.priority,
       daysUntilExam:
         task.daysUntilExam,
     });
 
-    remainingMinutes -=
+    remainingAvailableMinutes -=
       allocatedMinutes;
   }
 
@@ -266,5 +272,6 @@ module.exports = {
   getDaysUntilExam,
   findExamForSubject,
   calculatePriority,
+  getRemainingMinutes,
   generateStudyPlan,
 };
