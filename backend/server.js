@@ -22,6 +22,7 @@ let tasks = [
     subject: "Mathematics",
     time: "9:00 - 10:00",
     estimatedMinutes: 60,
+    completedMinutes: 0,
     difficulty: "medium",
     priority: "medium",
     completed: false,
@@ -31,6 +32,7 @@ let tasks = [
     subject: "Data Structures",
     time: "10:30 - 11:30",
     estimatedMinutes: 60,
+    completedMinutes: 0,
     difficulty: "hard",
     priority: "high",
     completed: false,
@@ -40,6 +42,7 @@ let tasks = [
     subject: "Database Systems",
     time: "2:00 - 3:00",
     estimatedMinutes: 60,
+    completedMinutes: 0,
     difficulty: "medium",
     priority: "medium",
     completed: false,
@@ -77,12 +80,18 @@ app.get("/", (req, res) => {
 // TASK ROUTES
 // ==================================================
 
+// ------------------------------------
 // GET ALL TASKS
+// ------------------------------------
+
 app.get("/api/tasks", (req, res) => {
   res.json(tasks);
 });
 
+// ------------------------------------
 // GET SINGLE TASK
+// ------------------------------------
+
 app.get("/api/tasks/:id", (req, res) => {
   const id = Number(req.params.id);
 
@@ -99,29 +108,46 @@ app.get("/api/tasks/:id", (req, res) => {
   res.json(task);
 });
 
+// ------------------------------------
 // CREATE NEW TASK
+// ------------------------------------
+
 app.post("/api/tasks", (req, res) => {
   const {
     subject,
     time,
     estimatedMinutes = 60,
+    completedMinutes = 0,
     difficulty = "medium",
     priority = "medium",
   } = req.body;
 
-  if (!subject || !subject.trim()) {
+  // Subject validation
+  if (
+    !subject ||
+    typeof subject !== "string" ||
+    !subject.trim()
+  ) {
     return res.status(400).json({
       message: "Subject is required",
     });
   }
 
-  if (!time || !time.trim()) {
+  // Time validation
+  if (
+    !time ||
+    typeof time !== "string" ||
+    !time.trim()
+  ) {
     return res.status(400).json({
       message: "Time is required",
     });
   }
 
-  const minutes = Number(estimatedMinutes);
+  // Estimated time validation
+  const minutes = Number(
+    estimatedMinutes
+  );
 
   if (
     !Number.isInteger(minutes) ||
@@ -133,26 +159,54 @@ app.post("/api/tasks", (req, res) => {
     });
   }
 
+  // Completed time validation
+  const studiedMinutes = Number(
+    completedMinutes
+  );
+
+  if (
+    !Number.isInteger(studiedMinutes) ||
+    studiedMinutes < 0
+  ) {
+    return res.status(400).json({
+      message:
+        "completedMinutes must be a non-negative whole number",
+    });
+  }
+
+  if (studiedMinutes > minutes) {
+    return res.status(400).json({
+      message:
+        "completedMinutes cannot exceed estimatedMinutes",
+    });
+  }
+
+  // Difficulty validation
   const validDifficulties = [
     "easy",
     "medium",
     "hard",
   ];
 
-  if (!validDifficulties.includes(difficulty)) {
+  if (
+    !validDifficulties.includes(difficulty)
+  ) {
     return res.status(400).json({
       message:
         "difficulty must be easy, medium, or hard",
     });
   }
 
+  // Priority validation
   const validPriorities = [
     "low",
     "medium",
     "high",
   ];
 
-  if (!validPriorities.includes(priority)) {
+  if (
+    !validPriorities.includes(priority)
+  ) {
     return res.status(400).json({
       message:
         "priority must be low, medium, or high",
@@ -170,9 +224,12 @@ app.post("/api/tasks", (req, res) => {
     subject: subject.trim(),
     time: time.trim(),
     estimatedMinutes: minutes,
+    completedMinutes: studiedMinutes,
     difficulty,
     priority,
-    completed: false,
+
+    completed:
+      studiedMinutes === minutes,
   };
 
   tasks.push(newTask);
@@ -180,7 +237,10 @@ app.post("/api/tasks", (req, res) => {
   res.status(201).json(newTask);
 });
 
+// ------------------------------------
 // UPDATE TASK
+// ------------------------------------
+
 app.put("/api/tasks/:id", (req, res) => {
   const id = Number(req.params.id);
 
@@ -194,6 +254,10 @@ app.put("/api/tasks/:id", (req, res) => {
     });
   }
 
+  // -------------------------------
+  // Update subject
+  // -------------------------------
+
   if (req.body.subject !== undefined) {
     if (
       typeof req.body.subject !== "string" ||
@@ -204,8 +268,13 @@ app.put("/api/tasks/:id", (req, res) => {
       });
     }
 
-    task.subject = req.body.subject.trim();
+    task.subject =
+      req.body.subject.trim();
   }
+
+  // -------------------------------
+  // Update time
+  // -------------------------------
 
   if (req.body.time !== undefined) {
     if (
@@ -220,7 +289,13 @@ app.put("/api/tasks/:id", (req, res) => {
     task.time = req.body.time.trim();
   }
 
-  if (req.body.estimatedMinutes !== undefined) {
+  // -------------------------------
+  // Update estimated minutes
+  // -------------------------------
+
+  if (
+    req.body.estimatedMinutes !== undefined
+  ) {
     const minutes = Number(
       req.body.estimatedMinutes
     );
@@ -235,10 +310,70 @@ app.put("/api/tasks/:id", (req, res) => {
       });
     }
 
+    if (
+      task.completedMinutes > minutes
+    ) {
+      return res.status(400).json({
+        message:
+          "estimatedMinutes cannot be less than completedMinutes",
+      });
+    }
+
     task.estimatedMinutes = minutes;
   }
 
-  if (req.body.difficulty !== undefined) {
+  // -------------------------------
+  // Update completed minutes
+  // -------------------------------
+
+  if (
+    req.body.completedMinutes !== undefined
+  ) {
+    const studiedMinutes = Number(
+      req.body.completedMinutes
+    );
+
+    if (
+      !Number.isInteger(studiedMinutes) ||
+      studiedMinutes < 0
+    ) {
+      return res.status(400).json({
+        message:
+          "completedMinutes must be a non-negative whole number",
+      });
+    }
+
+    if (
+      studiedMinutes >
+      task.estimatedMinutes
+    ) {
+      return res.status(400).json({
+        message:
+          "completedMinutes cannot exceed estimatedMinutes",
+      });
+    }
+
+    task.completedMinutes =
+      studiedMinutes;
+
+    // Automatically mark complete
+    if (
+      task.completedMinutes ===
+      task.estimatedMinutes
+    ) {
+      task.completed = true;
+    } else {
+      task.completed = false;
+    }
+  }
+
+  // -------------------------------
+  // Update difficulty
+  // -------------------------------
+
+  if (
+    req.body.difficulty !== undefined
+  ) {
     const validDifficulties = [
       "easy",
       "medium",
@@ -256,10 +391,17 @@ app.put("/api/tasks/:id", (req, res) => {
       });
     }
 
-    task.difficulty = req.body.difficulty;
+    task.difficulty =
+      req.body.difficulty;
   }
 
-  if (req.body.priority !== undefined) {
+  // -------------------------------
+  // Update priority
+  // -------------------------------
+
+  if (
+    req.body.priority !== undefined
+  ) {
     const validPriorities = [
       "low",
       "medium",
@@ -277,19 +419,38 @@ app.put("/api/tasks/:id", (req, res) => {
       });
     }
 
-    task.priority = req.body.priority;
+    task.priority =
+      req.body.priority;
   }
 
-  if (req.body.completed !== undefined) {
-    task.completed = Boolean(
+  // -------------------------------
+  // Update completed status
+  // -------------------------------
+
+  if (
+    req.body.completed !== undefined
+  ) {
+    const completed = Boolean(
       req.body.completed
     );
+
+    task.completed = completed;
+
+    // If manually marked completed,
+    // treat the whole task as studied.
+    if (completed) {
+      task.completedMinutes =
+        task.estimatedMinutes;
+    }
   }
 
   res.json(task);
 });
 
+// ------------------------------------
 // DELETE TASK
+// ------------------------------------
+
 app.delete("/api/tasks/:id", (req, res) => {
   const id = Number(req.params.id);
 
@@ -316,12 +477,18 @@ app.delete("/api/tasks/:id", (req, res) => {
 // EXAM ROUTES
 // ==================================================
 
+// ------------------------------------
 // GET ALL EXAMS
+// ------------------------------------
+
 app.get("/api/exams", (req, res) => {
   res.json(exams);
 });
 
+// ------------------------------------
 // GET SINGLE EXAM
+// ------------------------------------
+
 app.get("/api/exams/:id", (req, res) => {
   const id = Number(req.params.id);
 
@@ -338,9 +505,15 @@ app.get("/api/exams/:id", (req, res) => {
   res.json(exam);
 });
 
+// ------------------------------------
 // CREATE NEW EXAM
+// ------------------------------------
+
 app.post("/api/exams", (req, res) => {
-  const { subject, examDate } = req.body;
+  const {
+    subject,
+    examDate,
+  } = req.body;
 
   if (
     !subject ||
@@ -358,7 +531,9 @@ app.post("/api/exams", (req, res) => {
     });
   }
 
-  const date = new Date(examDate);
+  const date = new Date(
+    examDate
+  );
 
   if (Number.isNaN(date.getTime())) {
     return res.status(400).json({
@@ -370,7 +545,9 @@ app.post("/api/exams", (req, res) => {
     id:
       exams.length > 0
         ? Math.max(
-            ...exams.map((exam) => exam.id)
+            ...exams.map(
+              (exam) => exam.id
+            )
           ) + 1
         : 1,
 
@@ -383,7 +560,10 @@ app.post("/api/exams", (req, res) => {
   res.status(201).json(newExam);
 });
 
+// ------------------------------------
 // UPDATE EXAM
+// ------------------------------------
+
 app.put("/api/exams/:id", (req, res) => {
   const id = Number(req.params.id);
 
@@ -408,17 +588,21 @@ app.put("/api/exams/:id", (req, res) => {
       });
     }
 
-    exam.subject = req.body.subject.trim();
+    exam.subject =
+      req.body.subject.trim();
   }
 
-  if (req.body.examDate !== undefined) {
+  if (
+    req.body.examDate !== undefined
+  ) {
     const date = new Date(
       req.body.examDate
     );
 
     if (Number.isNaN(date.getTime())) {
       return res.status(400).json({
-        message: "Invalid exam date",
+        message:
+          "Invalid exam date",
       });
     }
 
@@ -429,7 +613,10 @@ app.put("/api/exams/:id", (req, res) => {
   res.json(exam);
 });
 
+// ------------------------------------
 // DELETE EXAM
+// ------------------------------------
+
 app.delete("/api/exams/:id", (req, res) => {
   const id = Number(req.params.id);
 
