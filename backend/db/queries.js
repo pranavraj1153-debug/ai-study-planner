@@ -343,12 +343,201 @@ async function deleteTask(id) {
 
   return result.rows.length > 0;
 }
+// ------------------------------------
+// GET ALL EXAMS
+// ------------------------------------
+
+async function getExams() {
+  const user = await getDevelopmentUser();
+
+  const result = await pool.query(
+    `
+    SELECT
+      id,
+      subject,
+      exam_date
+    FROM exams
+    WHERE user_id = $1
+    ORDER BY exam_date ASC, id ASC
+    `,
+    [user.id]
+  );
+
+  return result.rows.map((row) => ({
+    id: Number(row.id),
+    subject: row.subject,
+    examDate: row.exam_date,
+  }));
+}
+
+// ------------------------------------
+// GET SINGLE EXAM
+// ------------------------------------
+
+async function getExamById(id) {
+  const user = await getDevelopmentUser();
+
+  const result = await pool.query(
+    `
+    SELECT
+      id,
+      subject,
+      exam_date
+    FROM exams
+    WHERE id = $1
+      AND user_id = $2
+    LIMIT 1
+    `,
+    [id, user.id]
+  );
+
+  if (result.rows.length === 0) {
+    return null;
+  }
+
+  const row = result.rows[0];
+
+  return {
+    id: Number(row.id),
+    subject: row.subject,
+    examDate: row.exam_date,
+  };
+}
+
+// ------------------------------------
+// CREATE EXAM
+// ------------------------------------
+
+async function createExam({
+  subject,
+  examDate,
+}) {
+  const user = await getDevelopmentUser();
+
+  const result = await pool.query(
+    `
+    INSERT INTO exams (
+      user_id,
+      subject,
+      exam_date
+    )
+    VALUES ($1, $2, $3)
+    RETURNING
+      id,
+      subject,
+      exam_date
+    `,
+    [
+      user.id,
+      subject,
+      examDate,
+    ]
+  );
+
+  const row = result.rows[0];
+
+  return {
+    id: Number(row.id),
+    subject: row.subject,
+    examDate: row.exam_date,
+  };
+}
+
+// ------------------------------------
+// UPDATE EXAM
+// ------------------------------------
+
+async function updateExam(
+  id,
+  updates
+) {
+  const user = await getDevelopmentUser();
+
+  const existingExam =
+    await getExamById(id);
+
+  if (!existingExam) {
+    return null;
+  }
+
+  const subject =
+    updates.subject !== undefined
+      ? updates.subject
+      : existingExam.subject;
+
+  const examDate =
+    updates.examDate !== undefined
+      ? updates.examDate
+      : existingExam.examDate;
+
+  const result = await pool.query(
+    `
+    UPDATE exams
+    SET
+      subject = $1,
+      exam_date = $2
+    WHERE id = $3
+      AND user_id = $4
+    RETURNING
+      id,
+      subject,
+      exam_date
+    `,
+    [
+      subject,
+      examDate,
+      id,
+      user.id,
+    ]
+  );
+
+  if (result.rows.length === 0) {
+    return null;
+  }
+
+  const row = result.rows[0];
+
+  return {
+    id: Number(row.id),
+    subject: row.subject,
+    examDate: row.exam_date,
+  };
+}
+
+// ------------------------------------
+// DELETE EXAM
+// ------------------------------------
+
+async function deleteExam(id) {
+  const user = await getDevelopmentUser();
+
+  const result = await pool.query(
+    `
+    DELETE FROM exams
+    WHERE id = $1
+      AND user_id = $2
+    RETURNING id
+    `,
+    [id, user.id]
+  );
+
+  return result.rows.length > 0;
+}
 
 module.exports = {
   getDevelopmentUser,
+
+  // Tasks
   getTasks,
   getTaskById,
   createTask,
   updateTask,
   deleteTask,
+
+  // Exams
+  getExams,
+  getExamById,
+  createExam,
+  updateExam,
+  deleteExam,
 };
