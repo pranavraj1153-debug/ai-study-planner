@@ -520,6 +520,186 @@ async function deleteExam(id) {
 
   return result.rows.length > 0;
 }
+// ------------------------------------
+// CREATE STUDY SESSION
+// ------------------------------------
+
+async function createStudySession({
+  taskId,
+  minutes,
+  sessionDate,
+}) {
+  const user = await getDevelopmentUser();
+
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    // --------------------------------
+    // Get the task
+    // --------------------------------
+
+    const taskResult = await client.query(
+      `
+      SELECT
+        id,
+        estimated_minutes,
+        completed_minutes,
+        completed
+      FROM tasks
+      WHERE id = $1
+        AND user_id = $2
+      FOR UPDATE
+      `,
+      [taskId, user.id]
+    );
+
+    if (taskResult.rows.length === 0) {
+      throw new Error("Task not found");
+    }
+
+    const task = taskResult.rows[0];
+
+    // --------------------------------
+    // Validate remaining time
+    // --------------------------------
+
+    const remainingMinutes =
+      task.estimated_minutes -
+      task.completed_minutes;
+
+    if (minutes > remainingMinutes) {
+      throw new Error(
+        `Study session cannot exceed remaining task time of ${remainingMinutes} minutes`
+      );
+    }
+
+    // --------------------------------
+    // Insert study session
+    // --------------------------------
+
+    const sessionResult =
+      await client.query(
+        `
+        INSERT INTO study_sessions (
+          user_id,
+          task_id,
+          minutes,
+          session_date
+        )
+        VALUES (
+          $1,
+          $2,
+          $3,
+          COALESCE($4::date, CURRENT_DATE)
+        )
+        RETURNING
+          id,
+          task_id,
+          minutes,
+          session_date,
+          created_at
+        `,
+        [
+          user.id,
+          taskId,
+          minutes,
+          sessionDate || null,
+        ]
+      );
+
+    // --------------------------------
+    // Update task progress
+    // --------------------------------
+
+    const newCompletedMinutes =
+      task.completed_minutes +
+      minutes;
+
+    const completed =
+      newCompletedMinutes >=
+      task.estimated_minutes;
+
+    await client.query(
+      `
+      UPDATE tasks
+      SET
+        completed_minutes = $1,
+        completed = $2
+      WHERE id = $3
+        AND user_id = $4
+      `,
+      [
+        newCompletedMinutes,
+        completed,
+        taskId,
+        user.id,
+      ]
+    );
+
+    await client.query("COMMIT");
+
+    const session =
+      sessionResult.rows[0];
+
+    return {
+      id: Number(session.id),
+      taskId: Number(session.task_id),
+      minutes: session.minutes,
+      sessionDate: session.session_date,
+      createdAt: session.created_at,
+      completedMinutes:
+        newCompletedMinutes,
+      taskCompleted: completed,
+    };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+// ------------------------------------
+// GET STUDY SESSIONS
+// ------------------------------------
+
+async function getStudySessions() {
+  const user = await getDevelopmentUser();
+
+  const result = await pool.query(
+    `
+    SELECT
+      ss.id,
+      ss.task_id,
+      t.subject,
+      ss.minutes,
+      TO_CHAR(
+        ss.session_date,
+        'YYYY-MM-DD'
+      ) AS session_date,
+      ss.created_at
+    FROM study_sessions ss
+    LEFT JOIN tasks t
+      ON ss.task_id = t.id
+    WHERE ss.user_id = $1
+    ORDER BY
+      ss.session_date DESC,
+      ss.created_at DESC
+    `,
+    [user.id]
+  );
+
+  return result.rows.map((row) => ({
+    id: Number(row.id),
+    taskId: Number(row.task_id),
+    subject: row.subject,
+    minutes: row.minutes,
+    sessionDate: row.session_date,
+    createdAt: row.created_at,
+  }));
+}
 module.exports = {
   getDevelopmentUser,
 
@@ -536,4 +716,8 @@ module.exports = {
   createExam,
   updateExam,
   deleteExam,
+
+  // Study sessions
+  createStudySession,
+  getStudySessions,
 };
