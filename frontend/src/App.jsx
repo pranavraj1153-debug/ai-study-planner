@@ -1,86 +1,221 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 
-const API_URL = "http://localhost:5000/api/tasks";
+const TASKS_API_URL = "http://localhost:5000/api/tasks";
+const EXAMS_API_URL = "http://localhost:5000/api/exams";
 
 function App() {
+  // ==================================================
+  // TASK STATE
+  // ==================================================
+
   const [tasks, setTasks] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingTasks, setLoadingTasks] = useState(true);
+
+  // ==================================================
+  // EXAM STATE
+  // ==================================================
+
+  const [exams, setExams] = useState([]);
+  const [loadingExams, setLoadingExams] = useState(true);
+
+  // ==================================================
+  // GENERAL ERROR STATE
+  // ==================================================
+
   const [error, setError] = useState("");
 
-  // Add task form
+  // ==================================================
+  // ADD TASK FORM
+  // ==================================================
+
   const [subject, setSubject] = useState("");
   const [time, setTime] = useState("");
   const [addingTask, setAddingTask] = useState(false);
 
-  // ------------------------------------
-  // Load tasks from backend
-  // ------------------------------------
+  // ==================================================
+  // LOAD TASKS
+  // ==================================================
+
   useEffect(() => {
     const fetchTasks = async () => {
       try {
-        const response = await fetch(API_URL);
+        const response = await fetch(
+          TASKS_API_URL
+        );
 
         if (!response.ok) {
-          throw new Error("Failed to load tasks");
+          throw new Error(
+            "Failed to load tasks"
+          );
         }
 
         const data = await response.json();
+
         setTasks(data);
       } catch (err) {
         console.error(err);
-        setError("Unable to connect to the backend.");
+
+        setError(
+          "Unable to load tasks from the backend."
+        );
       } finally {
-        setLoading(false);
+        setLoadingTasks(false);
       }
     };
 
     fetchTasks();
   }, []);
 
-  // ------------------------------------
-  // Toggle task completion
-  // ------------------------------------
+  // ==================================================
+  // LOAD EXAMS
+  // ==================================================
+
+  useEffect(() => {
+    const fetchExams = async () => {
+      try {
+        const response = await fetch(
+          EXAMS_API_URL
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            "Failed to load exams"
+          );
+        }
+
+        const data = await response.json();
+
+        setExams(data);
+      } catch (err) {
+        console.error(err);
+
+        setError(
+          "Unable to load exams from the backend."
+        );
+      } finally {
+        setLoadingExams(false);
+      }
+    };
+
+    fetchExams();
+  }, []);
+
+  // ==================================================
+  // CALCULATE DAYS UNTIL EXAM
+  // ==================================================
+
+  const getDaysUntilExam = (examDate) => {
+    const today = new Date();
+
+    today.setHours(0, 0, 0, 0);
+
+    const exam = new Date(
+      `${examDate}T00:00:00`
+    );
+
+    exam.setHours(0, 0, 0, 0);
+
+    const difference =
+      exam.getTime() - today.getTime();
+
+    const days = Math.ceil(
+      difference /
+        (1000 * 60 * 60 * 24)
+    );
+
+    if (days < 0) {
+      return "Passed";
+    }
+
+    if (days === 0) {
+      return "Today";
+    }
+
+    if (days === 1) {
+      return "1 day";
+    }
+
+    return `${days} days`;
+  };
+
+  // ==================================================
+  // TOGGLE TASK COMPLETION
+  // ==================================================
+
   const toggleTask = async (id) => {
-    const task = tasks.find((task) => task.id === id);
+    const task = tasks.find(
+      (task) => task.id === id
+    );
 
     if (!task) return;
 
-    const oldCompleted = task.completed;
-    const updatedCompleted = !oldCompleted;
+    const oldCompleted =
+      task.completed;
+
+    const updatedCompleted =
+      !oldCompleted;
+
+    // For the current UI:
+    // checking = full task completed
+    // unchecking = reset study progress
+    const updatedCompletedMinutes =
+      updatedCompleted
+        ? task.estimatedMinutes
+        : 0;
 
     // Update UI immediately
     setTasks((currentTasks) =>
       currentTasks.map((task) =>
         task.id === id
-          ? { ...task, completed: updatedCompleted }
+          ? {
+              ...task,
+              completed:
+                updatedCompleted,
+              completedMinutes:
+                updatedCompletedMinutes,
+            }
           : task
       )
     );
 
     try {
-      const response = await fetch(`${API_URL}/${id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          completed: updatedCompleted,
-        }),
-      });
+      const response = await fetch(
+        `${TASKS_API_URL}/${id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            completed:
+              updatedCompleted,
+            completedMinutes:
+              updatedCompletedMinutes,
+          }),
+        }
+      );
 
       if (!response.ok) {
-        throw new Error("Failed to update task");
+        throw new Error(
+          "Failed to update task"
+        );
       }
 
-      const updatedTask = await response.json();
+      const updatedTask =
+        await response.json();
 
-      // Make frontend match backend
+      // Match frontend with backend
       setTasks((currentTasks) =>
         currentTasks.map((task) =>
-          task.id === id ? updatedTask : task
+          task.id === id
+            ? updatedTask
+            : task
         )
       );
+
+      setError("");
     } catch (err) {
       console.error(err);
 
@@ -88,12 +223,20 @@ function App() {
       setTasks((currentTasks) =>
         currentTasks.map((task) =>
           task.id === id
-            ? { ...task, completed: oldCompleted }
+            ? {
+                ...task,
+                completed:
+                  oldCompleted,
+                completedMinutes:
+                  task.completedMinutes,
+              }
             : task
         )
       );
 
-      setError("Could not save the task.");
+      setError(
+        "Could not save the task."
+      );
 
       setTimeout(() => {
         setError("");
@@ -101,14 +244,21 @@ function App() {
     }
   };
 
-  // ------------------------------------
-  // Add new task
-  // ------------------------------------
+  // ==================================================
+  // ADD TASK
+  // ==================================================
+
   const addTask = async (event) => {
     event.preventDefault();
 
-    if (!subject.trim() || !time.trim()) {
-      setError("Please enter both subject and time.");
+    if (
+      !subject.trim() ||
+      !time.trim()
+    ) {
+      setError(
+        "Please enter both subject and time."
+      );
+
       return;
     }
 
@@ -116,63 +266,87 @@ function App() {
     setError("");
 
     try {
-      const response = await fetch(API_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          subject: subject.trim(),
-          time: time.trim(),
-        }),
-      });
+      const response = await fetch(
+        TASKS_API_URL,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            subject: subject.trim(),
+            time: time.trim(),
+          }),
+        }
+      );
 
       if (!response.ok) {
-        throw new Error("Failed to add task");
+        throw new Error(
+          "Failed to add task"
+        );
       }
 
-      const newTask = await response.json();
+      const newTask =
+        await response.json();
 
-      // Add new task to screen
-      setTasks((currentTasks) => [...currentTasks, newTask]);
+      setTasks((currentTasks) => [
+        ...currentTasks,
+        newTask,
+      ]);
 
-      // Clear form
       setSubject("");
       setTime("");
     } catch (err) {
       console.error(err);
-      setError("Could not add the task.");
+
+      setError(
+        "Could not add the task."
+      );
     } finally {
       setAddingTask(false);
     }
   };
 
-  // ------------------------------------
-  // Delete task
-  // ------------------------------------
+  // ==================================================
+  // DELETE TASK
+  // ==================================================
+
   const deleteTask = async (id) => {
-    const confirmed = window.confirm(
-      "Are you sure you want to delete this task?"
-    );
+    const confirmed =
+      window.confirm(
+        "Are you sure you want to delete this task?"
+      );
 
     if (!confirmed) return;
 
     try {
-      const response = await fetch(`${API_URL}/${id}`, {
-        method: "DELETE",
-      });
+      const response = await fetch(
+        `${TASKS_API_URL}/${id}`,
+        {
+          method: "DELETE",
+        }
+      );
 
       if (!response.ok) {
-        throw new Error("Failed to delete task");
+        throw new Error(
+          "Failed to delete task"
+        );
       }
 
-      // Remove from UI
       setTasks((currentTasks) =>
-        currentTasks.filter((task) => task.id !== id)
+        currentTasks.filter(
+          (task) => task.id !== id
+        )
       );
+
+      setError("");
     } catch (err) {
       console.error(err);
-      setError("Could not delete the task.");
+
+      setError(
+        "Could not delete the task."
+      );
 
       setTimeout(() => {
         setError("");
@@ -180,23 +354,31 @@ function App() {
     }
   };
 
-  // ------------------------------------
-  // Statistics
-  // ------------------------------------
-  const completedTasks = tasks.filter(
-    (task) => task.completed
-  ).length;
+  // ==================================================
+  // STATISTICS
+  // ==================================================
 
-  const totalTasks = tasks.length;
+  const completedTasks =
+    tasks.filter(
+      (task) => task.completed
+    ).length;
+
+  const totalTasks =
+    tasks.length;
 
   const progress =
     totalTasks === 0
       ? 0
-      : Math.round((completedTasks / totalTasks) * 100);
+      : Math.round(
+          (completedTasks /
+            totalTasks) *
+            100
+        );
 
-  // ------------------------------------
+  // ==================================================
   // UI
-  // ------------------------------------
+  // ==================================================
+
   return (
     <div className="app">
 
@@ -205,9 +387,17 @@ function App() {
         <h1>AI Study Planner</h1>
 
         <nav>
-          <a href="#">Dashboard</a>
-          <a href="#">Tasks</a>
-          <a href="#">Exams</a>
+          <a href="#">
+            Dashboard
+          </a>
+
+          <a href="#">
+            Tasks
+          </a>
+
+          <a href="#">
+            Exams
+          </a>
         </nav>
       </header>
 
@@ -215,8 +405,13 @@ function App() {
 
         {/* Welcome */}
         <section className="welcome">
-          <h2>Good morning 👋</h2>
-          <p>Let's make today productive.</p>
+          <h2>
+            Good morning 👋
+          </h2>
+
+          <p>
+            Let's make today productive.
+          </p>
         </section>
 
         {/* Error */}
@@ -238,18 +433,33 @@ function App() {
         <section className="stats">
 
           <div className="stat-card">
-            <h3>Today's Tasks</h3>
-            <strong>{totalTasks}</strong>
+            <h3>
+              Today's Tasks
+            </h3>
+
+            <strong>
+              {totalTasks}
+            </strong>
           </div>
 
           <div className="stat-card">
-            <h3>Completed</h3>
-            <strong>{completedTasks}</strong>
+            <h3>
+              Completed
+            </h3>
+
+            <strong>
+              {completedTasks}
+            </strong>
           </div>
 
           <div className="stat-card">
-            <h3>Progress</h3>
-            <strong>{progress}%</strong>
+            <h3>
+              Progress
+            </h3>
+
+            <strong>
+              {progress}%
+            </strong>
           </div>
 
         </section>
@@ -257,11 +467,11 @@ function App() {
         {/* Study Plan */}
         <section className="study-plan">
 
-          <h2>Today's Study Plan</h2>
+          <h2>
+            Today's Study Plan
+          </h2>
 
-          {/* ------------------------------------
-              ADD TASK FORM
-          ------------------------------------ */}
+          {/* Add Task Form */}
           <form
             onSubmit={addTask}
             style={{
@@ -270,7 +480,8 @@ function App() {
               flexWrap: "wrap",
               marginBottom: "25px",
               padding: "20px",
-              background: "#f8fafc",
+              background:
+                "#f8fafc",
               borderRadius: "12px",
             }}
           >
@@ -278,12 +489,17 @@ function App() {
               type="text"
               placeholder="Subject"
               value={subject}
-              onChange={(e) => setSubject(e.target.value)}
+              onChange={(e) =>
+                setSubject(
+                  e.target.value
+                )
+              }
               style={{
                 flex: "1",
                 minWidth: "180px",
                 padding: "12px",
-                border: "1px solid #d1d5db",
+                border:
+                  "1px solid #d1d5db",
                 borderRadius: "8px",
                 fontSize: "15px",
               }}
@@ -293,12 +509,17 @@ function App() {
               type="text"
               placeholder="Time e.g. 4:00 - 5:00"
               value={time}
-              onChange={(e) => setTime(e.target.value)}
+              onChange={(e) =>
+                setTime(
+                  e.target.value
+                )
+              }
               style={{
                 flex: "1",
                 minWidth: "180px",
                 padding: "12px",
-                border: "1px solid #d1d5db",
+                border:
+                  "1px solid #d1d5db",
                 borderRadius: "8px",
                 fontSize: "15px",
               }}
@@ -308,59 +529,89 @@ function App() {
               type="submit"
               disabled={addingTask}
               style={{
-                padding: "12px 20px",
-                background: "#2563eb",
+                padding:
+                  "12px 20px",
+                background:
+                  "#2563eb",
                 color: "white",
                 border: "none",
                 borderRadius: "8px",
-                cursor: addingTask ? "not-allowed" : "pointer",
+                cursor: addingTask
+                  ? "not-allowed"
+                  : "pointer",
                 fontWeight: "600",
               }}
             >
-              {addingTask ? "Adding..." : "+ Add Task"}
+              {addingTask
+                ? "Adding..."
+                : "+ Add Task"}
             </button>
           </form>
 
-          {/* ------------------------------------
-              TASK LIST
-          ------------------------------------ */}
-          {loading ? (
-            <p>Loading tasks...</p>
+          {/* Task List */}
+          {loadingTasks ? (
+            <p>
+              Loading tasks...
+            </p>
           ) : tasks.length === 0 ? (
-            <p>No tasks available.</p>
+            <p>
+              No tasks available.
+            </p>
           ) : (
             tasks.map((task) => (
-              <div className="task" key={task.id}>
+              <div
+                className="task"
+                key={task.id}
+              >
 
                 <input
                   type="checkbox"
-                  checked={task.completed}
-                  onChange={() => toggleTask(task.id)}
+                  checked={
+                    task.completed
+                  }
+                  onChange={() =>
+                    toggleTask(
+                      task.id
+                    )
+                  }
                 />
 
                 <span
                   style={{
-                    textDecoration: task.completed
-                      ? "line-through"
-                      : "none",
-                    opacity: task.completed ? 0.5 : 1,
+                    textDecoration:
+                      task.completed
+                        ? "line-through"
+                        : "none",
+                    opacity:
+                      task.completed
+                        ? 0.5
+                        : 1,
                   }}
                 >
                   {task.subject}
                 </span>
 
-                <small>{task.time}</small>
+                <small>
+                  {task.time}
+                </small>
 
-                {/* Delete button */}
                 <button
-                  onClick={() => deleteTask(task.id)}
+                  onClick={() =>
+                    deleteTask(
+                      task.id
+                    )
+                  }
                   title="Delete task"
                   style={{
-                    marginLeft: "15px",
+                    marginLeft:
+                      "15px",
                     border: "none",
-                    background: "transparent",
-                    cursor: "pointer",
-                    fontSize: "20px",
+                    background:
+                      "transparent",
+                    cursor:
+                      "pointer",
+                    fontSize:
+                      "20px",
                   }}
                 >
                   🗑️
@@ -375,17 +626,52 @@ function App() {
         {/* Upcoming Exams */}
         <section className="exams">
 
-          <h2>Upcoming Exams</h2>
+          <h2>
+            Upcoming Exams
+          </h2>
 
-          <div className="exam">
-            <span>Data Structures</span>
-            <strong>12 days</strong>
-          </div>
+          {loadingExams ? (
+            <p>
+              Loading exams...
+            </p>
+          ) : exams.length === 0 ? (
+            <p>
+              No upcoming exams.
+            </p>
+          ) : (
+            exams.map((exam) => (
+              <div
+                className="exam"
+                key={exam.id}
+              >
+                <div>
+                  <span>
+                    {exam.subject}
+                  </span>
 
-          <div className="exam">
-            <span>Database Systems</span>
-            <strong>18 days</strong>
-          </div>
+                  <small
+                    style={{
+                      display:
+                        "block",
+                      marginTop:
+                        "4px",
+                      color:
+                        "#6b7280",
+                    }}
+                  >
+                    Exam date:{" "}
+                    {exam.examDate}
+                  </small>
+                </div>
+
+                <strong>
+                  {getDaysUntilExam(
+                    exam.examDate
+                  )}
+                </strong>
+              </div>
+            ))
+          )}
 
         </section>
 
