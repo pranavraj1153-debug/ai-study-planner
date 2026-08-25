@@ -8,17 +8,54 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Add task form
-  const [subject, setSubject] = useState("");
-  const [time, setTime] = useState("");
-  const [addingTask, setAddingTask] = useState(false);
+  const [newSubject, setNewSubject] = useState("");
+  const [newTime, setNewTime] = useState("");
 
-  // ------------------------------------
-  // Load tasks from backend
-  // ------------------------------------
+  // ==========================================
+  // TIME-BASED GREETING
+  // ==========================================
+
+  const [currentHour, setCurrentHour] = useState(
+    new Date().getHours()
+  );
+
+  useEffect(() => {
+    const updateTime = () => {
+      setCurrentHour(new Date().getHours());
+    };
+
+    // Check the time every minute
+    const timer = setInterval(updateTime, 60000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  let greeting;
+  let greetingEmoji;
+
+  if (currentHour >= 5 && currentHour < 12) {
+    greeting = "Good morning";
+    greetingEmoji = "🌅";
+  } else if (currentHour >= 12 && currentHour < 17) {
+    greeting = "Good afternoon";
+    greetingEmoji = "☀️";
+  } else if (currentHour >= 17 && currentHour < 21) {
+    greeting = "Good evening";
+    greetingEmoji = "🌇";
+  } else {
+    greeting = "Good night";
+    greetingEmoji = "🌙";
+  }
+
+  // ==========================================
+  // LOAD TASKS FROM BACKEND
+  // ==========================================
+
   useEffect(() => {
     const fetchTasks = async () => {
       try {
+        setError("");
+
         const response = await fetch(API_URL);
 
         if (!response.ok) {
@@ -26,6 +63,7 @@ function App() {
         }
 
         const data = await response.json();
+
         setTasks(data);
       } catch (err) {
         console.error(err);
@@ -38,9 +76,43 @@ function App() {
     fetchTasks();
   }, []);
 
-  // ------------------------------------
-  // Toggle task completion
-  // ------------------------------------
+  // ==========================================
+  // CLICK / TOUCH EFFECT
+  // ==========================================
+
+  useEffect(() => {
+    const handlePointerDown = (event) => {
+      const effect = document.createElement("div");
+
+      effect.className = "click-effect";
+
+      effect.style.left = `${event.clientX}px`;
+      effect.style.top = `${event.clientY}px`;
+
+      document.body.appendChild(effect);
+
+      setTimeout(() => {
+        effect.remove();
+      }, 700);
+    };
+
+    document.addEventListener(
+      "pointerdown",
+      handlePointerDown
+    );
+
+    return () => {
+      document.removeEventListener(
+        "pointerdown",
+        handlePointerDown
+      );
+    };
+  }, []);
+
+  // ==========================================
+  // TOGGLE TASK
+  // ==========================================
+
   const toggleTask = async (id) => {
     const task = tasks.find((task) => task.id === id);
 
@@ -49,11 +121,14 @@ function App() {
     const oldCompleted = task.completed;
     const updatedCompleted = !oldCompleted;
 
-    // Update UI immediately
+    // Update screen immediately
     setTasks((currentTasks) =>
       currentTasks.map((task) =>
         task.id === id
-          ? { ...task, completed: updatedCompleted }
+          ? {
+              ...task,
+              completed: updatedCompleted,
+            }
           : task
       )
     );
@@ -75,7 +150,6 @@ function App() {
 
       const updatedTask = await response.json();
 
-      // Make frontend match backend
       setTasks((currentTasks) =>
         currentTasks.map((task) =>
           task.id === id ? updatedTask : task
@@ -84,46 +158,51 @@ function App() {
     } catch (err) {
       console.error(err);
 
-      // Restore previous state
+      // Restore old state
       setTasks((currentTasks) =>
         currentTasks.map((task) =>
           task.id === id
-            ? { ...task, completed: oldCompleted }
+            ? {
+                ...task,
+                completed: oldCompleted,
+              }
             : task
         )
       );
 
       setError("Could not save the task.");
-
-      setTimeout(() => {
-        setError("");
-      }, 3000);
     }
   };
 
-  // ------------------------------------
-  // Add new task
-  // ------------------------------------
+  // ==========================================
+  // ADD TASK
+  // ==========================================
+
   const addTask = async (event) => {
     event.preventDefault();
 
-    if (!subject.trim() || !time.trim()) {
-      setError("Please enter both subject and time.");
+    if (
+      !newSubject.trim() ||
+      !newTime.trim()
+    ) {
+      setError(
+        "Please enter both subject and time."
+      );
+
       return;
     }
 
-    setAddingTask(true);
-    setError("");
-
     try {
+      setError("");
+
       const response = await fetch(API_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          subject: subject.trim(),
-          time: time.trim(),
+          subject: newSubject,
+          time: newTime,
         }),
       });
 
@@ -133,56 +212,55 @@ function App() {
 
       const newTask = await response.json();
 
-      // Add new task to screen
-      setTasks((currentTasks) => [...currentTasks, newTask]);
+      setTasks((currentTasks) => [
+        ...currentTasks,
+        newTask,
+      ]);
 
-      // Clear form
-      setSubject("");
-      setTime("");
+      setNewSubject("");
+      setNewTime("");
     } catch (err) {
       console.error(err);
+
       setError("Could not add the task.");
-    } finally {
-      setAddingTask(false);
     }
   };
 
-  // ------------------------------------
-  // Delete task
-  // ------------------------------------
+  // ==========================================
+  // DELETE TASK
+  // ==========================================
+
   const deleteTask = async (id) => {
-    const confirmed = window.confirm(
-      "Are you sure you want to delete this task?"
-    );
-
-    if (!confirmed) return;
-
     try {
-      const response = await fetch(`${API_URL}/${id}`, {
-        method: "DELETE",
-      });
+      setError("");
+
+      const response = await fetch(
+        `${API_URL}/${id}`,
+        {
+          method: "DELETE",
+        }
+      );
 
       if (!response.ok) {
         throw new Error("Failed to delete task");
       }
 
-      // Remove from UI
       setTasks((currentTasks) =>
-        currentTasks.filter((task) => task.id !== id)
+        currentTasks.filter(
+          (task) => task.id !== id
+        )
       );
     } catch (err) {
       console.error(err);
-      setError("Could not delete the task.");
 
-      setTimeout(() => {
-        setError("");
-      }, 3000);
+      setError("Could not delete the task.");
     }
   };
 
-  // ------------------------------------
-  // Statistics
-  // ------------------------------------
+  // ==========================================
+  // STATISTICS
+  // ==========================================
+
   const completedTasks = tasks.filter(
     (task) => task.completed
   ).length;
@@ -192,204 +270,380 @@ function App() {
   const progress =
     totalTasks === 0
       ? 0
-      : Math.round((completedTasks / totalTasks) * 100);
+      : Math.round(
+          (completedTasks / totalTasks) * 100
+        );
 
-  // ------------------------------------
+  // ==========================================
   // UI
-  // ------------------------------------
+  // ==========================================
+
   return (
     <div className="app">
 
-      {/* Header */}
+      {/* HEADER */}
+
       <header className="header">
-        <h1>AI Study Planner</h1>
+
+        <div>
+          <h1>AI Study Planner</h1>
+
+          <p>
+            Your intelligent study space
+          </p>
+        </div>
 
         <nav>
-          <a href="#">Dashboard</a>
-          <a href="#">Tasks</a>
-          <a href="#">Exams</a>
+          <a href="#dashboard">
+            Dashboard
+          </a>
+
+          <a href="#tasks">
+            Tasks
+          </a>
+
+          <a href="#exams">
+            Exams
+          </a>
         </nav>
+
       </header>
 
-      <main className="dashboard">
+      {/* MAIN DASHBOARD */}
 
-        {/* Welcome */}
+      <main
+        className="dashboard"
+        id="dashboard"
+      >
+
+        {/* GREETING */}
+
         <section className="welcome">
-          <h2>Good morning 👋</h2>
-          <p>Let's make today productive.</p>
+
+          <div>
+
+            <h2>
+              {greeting} {greetingEmoji}
+            </h2>
+
+            <p>
+              Let's make today productive.
+            </p>
+
+          </div>
+
+          <div className="progress-badge">
+
+            <span>
+              Today's Progress
+            </span>
+
+            <strong>
+              {progress}%
+            </strong>
+
+          </div>
+
         </section>
 
-        {/* Error */}
+        {/* ERROR */}
+
         {error && (
-          <div
-            style={{
-              background: "#fee2e2",
-              color: "#991b1b",
-              padding: "12px 16px",
-              borderRadius: "8px",
-              marginBottom: "20px",
-            }}
-          >
+          <div className="error-message">
             {error}
           </div>
         )}
 
-        {/* Statistics */}
+        {/* STATISTICS */}
+
         <section className="stats">
 
           <div className="stat-card">
-            <h3>Today's Tasks</h3>
-            <strong>{totalTasks}</strong>
+
+            <span className="stat-icon">
+              📚
+            </span>
+
+            <div>
+
+              <h3>
+                Today's Tasks
+              </h3>
+
+              <strong>
+                {totalTasks}
+              </strong>
+
+            </div>
+
           </div>
 
           <div className="stat-card">
-            <h3>Completed</h3>
-            <strong>{completedTasks}</strong>
+
+            <span className="stat-icon">
+              ✅
+            </span>
+
+            <div>
+
+              <h3>
+                Completed
+              </h3>
+
+              <strong>
+                {completedTasks}
+              </strong>
+
+            </div>
+
           </div>
 
           <div className="stat-card">
-            <h3>Progress</h3>
-            <strong>{progress}%</strong>
+
+            <span className="stat-icon">
+              🎯
+            </span>
+
+            <div>
+
+              <h3>
+                Progress
+              </h3>
+
+              <strong>
+                {progress}%
+              </strong>
+
+            </div>
+
           </div>
 
         </section>
 
-        {/* Study Plan */}
-        <section className="study-plan">
+        {/* ADD TASK */}
 
-          <h2>Today's Study Plan</h2>
+        <section
+          className="add-task"
+          id="tasks"
+        >
 
-          {/* ------------------------------------
-              ADD TASK FORM
-          ------------------------------------ */}
-          <form
-            onSubmit={addTask}
-            style={{
-              display: "flex",
-              gap: "10px",
-              flexWrap: "wrap",
-              marginBottom: "25px",
-              padding: "20px",
-              background: "#f8fafc",
-              borderRadius: "12px",
-            }}
-          >
+          <h2>
+            Add a New Task
+          </h2>
+
+          <form onSubmit={addTask}>
+
             <input
               type="text"
               placeholder="Subject"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              style={{
-                flex: "1",
-                minWidth: "180px",
-                padding: "12px",
-                border: "1px solid #d1d5db",
-                borderRadius: "8px",
-                fontSize: "15px",
-              }}
+              value={newSubject}
+              onChange={(event) =>
+                setNewSubject(
+                  event.target.value
+                )
+              }
             />
 
             <input
               type="text"
               placeholder="Time e.g. 4:00 - 5:00"
-              value={time}
-              onChange={(e) => setTime(e.target.value)}
-              style={{
-                flex: "1",
-                minWidth: "180px",
-                padding: "12px",
-                border: "1px solid #d1d5db",
-                borderRadius: "8px",
-                fontSize: "15px",
-              }}
+              value={newTime}
+              onChange={(event) =>
+                setNewTime(
+                  event.target.value
+                )
+              }
             />
 
-            <button
-              type="submit"
-              disabled={addingTask}
-              style={{
-                padding: "12px 20px",
-                background: "#2563eb",
-                color: "white",
-                border: "none",
-                borderRadius: "8px",
-                cursor: addingTask ? "not-allowed" : "pointer",
-                fontWeight: "600",
-              }}
-            >
-              {addingTask ? "Adding..." : "+ Add Task"}
+            <button type="submit">
+              + Add Task
             </button>
+
           </form>
 
-          {/* ------------------------------------
-              TASK LIST
-          ------------------------------------ */}
+        </section>
+
+        {/* STUDY PLAN */}
+
+        <section className="study-plan">
+
+          <div className="section-heading">
+
+            <div>
+
+              <h2>
+                Today's Study Plan
+              </h2>
+
+              <p>
+                Stay focused and complete your
+                goals.
+              </p>
+
+            </div>
+
+            <span className="task-count">
+              {completedTasks}/{totalTasks} completed
+            </span>
+
+          </div>
+
           {loading ? (
-            <p>Loading tasks...</p>
+
+            <p className="empty-message">
+              Loading tasks...
+            </p>
+
           ) : tasks.length === 0 ? (
-            <p>No tasks available.</p>
+
+            <p className="empty-message">
+              No tasks available. Add your first
+              task above.
+            </p>
+
           ) : (
-            tasks.map((task) => (
-              <div className="task" key={task.id}>
 
-                <input
-                  type="checkbox"
-                  checked={task.completed}
-                  onChange={() => toggleTask(task.id)}
-                />
+            <div className="task-list">
 
-                <span
-                  style={{
-                    textDecoration: task.completed
-                      ? "line-through"
-                      : "none",
-                    opacity: task.completed ? 0.5 : 1,
-                  }}
+              {tasks.map((task) => (
+
+                <div
+                  className={`task ${
+                    task.completed
+                      ? "completed"
+                      : ""
+                  }`}
+                  key={task.id}
                 >
-                  {task.subject}
-                </span>
 
-                <small>{task.time}</small>
+                  <input
+                    type="checkbox"
+                    checked={task.completed}
+                    onChange={() =>
+                      toggleTask(task.id)
+                    }
+                  />
 
-                {/* Delete button */}
-                <button
-                  onClick={() => deleteTask(task.id)}
-                  title="Delete task"
-                  style={{
-                    marginLeft: "15px",
-                    border: "none",
-                    background: "transparent",
-                    cursor: "pointer",
-                    fontSize: "20px",
-                  }}
-                >
-                  🗑️
-                </button>
+                  <div className="task-info">
 
-              </div>
-            ))
+                    <strong>
+                      {task.subject}
+                    </strong>
+
+                    <small>
+                      {task.time}
+                    </small>
+
+                  </div>
+
+                  <button
+                    className="delete-button"
+                    onClick={() =>
+                      deleteTask(task.id)
+                    }
+                    type="button"
+                  >
+                    Delete
+                  </button>
+
+                </div>
+
+              ))}
+
+            </div>
+
           )}
 
         </section>
 
-        {/* Upcoming Exams */}
-        <section className="exams">
+        {/* PROGRESS */}
 
-          <h2>Upcoming Exams</h2>
+        <section className="progress-section">
 
-          <div className="exam">
-            <span>Data Structures</span>
-            <strong>12 days</strong>
+          <div className="progress-card">
+
+            <div>
+
+              <h2>
+                Study Progress
+              </h2>
+
+              <p>
+                You've completed{" "}
+                {completedTasks} out of{" "}
+                {totalTasks} tasks.
+              </p>
+
+            </div>
+
+            <div className="progress-circle">
+
+              <div
+                className="progress-circle-inner"
+                style={{
+                  background:
+                    `conic-gradient(
+                      #7c3aed ${progress}%,
+                      #e9e5ff ${progress}% 100%
+                    )`,
+                }}
+              >
+
+                <span>
+                  {progress}%
+                </span>
+
+              </div>
+
+            </div>
+
           </div>
 
-          <div className="exam">
-            <span>Database Systems</span>
-            <strong>18 days</strong>
+        </section>
+
+        {/* UPCOMING EXAMS */}
+
+        <section
+          className="exams"
+          id="exams"
+        >
+
+          <h2>
+            Upcoming Exams
+          </h2>
+
+          <div className="exam-list">
+
+            <div className="exam">
+
+              <span>
+                📘 Data Structures
+              </span>
+
+              <strong>
+                12 days
+              </strong>
+
+            </div>
+
+            <div className="exam">
+
+              <span>
+                💾 Database Systems
+              </span>
+
+              <strong>
+                18 days
+              </strong>
+
+            </div>
+
           </div>
 
         </section>
 
       </main>
+
     </div>
   );
 }
