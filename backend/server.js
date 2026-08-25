@@ -13,6 +13,12 @@ const {
   createTask,
   updateTask,
   deleteTask,
+
+  getExams,
+  getExamById,
+  createExam,
+  updateExam,
+  deleteExam,
 } = require("./db/queries");
 
 const app = express();
@@ -22,25 +28,6 @@ const app = express();
 // ------------------------------------
 app.use(cors());
 app.use(express.json());
-
-// ==================================================
-// EXAM DATA
-// NOTE: Exams are still in-memory for now.
-// We will migrate them to PostgreSQL next.
-// ==================================================
-
-let exams = [
-  {
-    id: 1,
-    subject: "Data Structures",
-    examDate: "2026-09-03",
-  },
-  {
-    id: 2,
-    subject: "Database Systems",
-    examDate: "2026-09-09",
-  },
-];
 
 // ==================================================
 // HOME ROUTE
@@ -56,10 +43,7 @@ app.get("/", (req, res) => {
 // TASK ROUTES - POSTGRESQL
 // ==================================================
 
-// ------------------------------------
 // GET ALL TASKS
-// ------------------------------------
-
 app.get("/api/tasks", async (req, res) => {
   try {
     const tasks = await getTasks();
@@ -74,10 +58,7 @@ app.get("/api/tasks", async (req, res) => {
   }
 });
 
-// ------------------------------------
 // GET SINGLE TASK
-// ------------------------------------
-
 app.get("/api/tasks/:id", async (req, res) => {
   const id = Number(req.params.id);
 
@@ -109,10 +90,7 @@ app.get("/api/tasks/:id", async (req, res) => {
   }
 });
 
-// ------------------------------------
-// CREATE NEW TASK
-// ------------------------------------
-
+// CREATE TASK
 app.post("/api/tasks", async (req, res) => {
   const {
     subject,
@@ -123,7 +101,6 @@ app.post("/api/tasks", async (req, res) => {
     priority = "medium",
   } = req.body;
 
-  // Subject validation
   if (
     !subject ||
     typeof subject !== "string" ||
@@ -134,7 +111,6 @@ app.post("/api/tasks", async (req, res) => {
     });
   }
 
-  // Time validation
   if (
     !time ||
     typeof time !== "string" ||
@@ -145,8 +121,8 @@ app.post("/api/tasks", async (req, res) => {
     });
   }
 
-  // Estimated minutes
   const minutes = Number(estimatedMinutes);
+  const studiedMinutes = Number(completedMinutes);
 
   if (
     !Number.isInteger(minutes) ||
@@ -157,10 +133,6 @@ app.post("/api/tasks", async (req, res) => {
         "estimatedMinutes must be a positive whole number",
     });
   }
-
-  // Completed minutes
-  const studiedMinutes =
-    Number(completedMinutes);
 
   if (
     !Number.isInteger(studiedMinutes) ||
@@ -179,15 +151,10 @@ app.post("/api/tasks", async (req, res) => {
     });
   }
 
-  // Difficulty
-  const validDifficulties = [
-    "easy",
-    "medium",
-    "hard",
-  ];
-
   if (
-    !validDifficulties.includes(difficulty)
+    !["easy", "medium", "hard"].includes(
+      difficulty
+    )
   ) {
     return res.status(400).json({
       message:
@@ -195,15 +162,10 @@ app.post("/api/tasks", async (req, res) => {
     });
   }
 
-  // Priority
-  const validPriorities = [
-    "low",
-    "medium",
-    "high",
-  ];
-
   if (
-    !validPriorities.includes(priority)
+    !["low", "medium", "high"].includes(
+      priority
+    )
   ) {
     return res.status(400).json({
       message:
@@ -234,10 +196,7 @@ app.post("/api/tasks", async (req, res) => {
   }
 });
 
-// ------------------------------------
 // UPDATE TASK
-// ------------------------------------
-
 app.put("/api/tasks/:id", async (req, res) => {
   const id = Number(req.params.id);
 
@@ -257,7 +216,6 @@ app.put("/api/tasks/:id", async (req, res) => {
     completed,
   } = req.body;
 
-  // Validate subject if provided
   if (subject !== undefined) {
     if (
       typeof subject !== "string" ||
@@ -269,7 +227,6 @@ app.put("/api/tasks/:id", async (req, res) => {
     }
   }
 
-  // Validate time if provided
   if (time !== undefined) {
     if (
       typeof time !== "string" ||
@@ -281,15 +238,14 @@ app.put("/api/tasks/:id", async (req, res) => {
     }
   }
 
-  // Validate estimated minutes if provided
   if (estimatedMinutes !== undefined) {
-    const minutes = Number(
+    const value = Number(
       estimatedMinutes
     );
 
     if (
-      !Number.isInteger(minutes) ||
-      minutes <= 0
+      !Number.isInteger(value) ||
+      value <= 0
     ) {
       return res.status(400).json({
         message:
@@ -298,15 +254,14 @@ app.put("/api/tasks/:id", async (req, res) => {
     }
   }
 
-  // Validate completed minutes if provided
   if (completedMinutes !== undefined) {
-    const studiedMinutes = Number(
+    const value = Number(
       completedMinutes
     );
 
     if (
-      !Number.isInteger(studiedMinutes) ||
-      studiedMinutes < 0
+      !Number.isInteger(value) ||
+      value < 0
     ) {
       return res.status(400).json({
         message:
@@ -315,45 +270,31 @@ app.put("/api/tasks/:id", async (req, res) => {
     }
   }
 
-  // Validate difficulty
-  if (difficulty !== undefined) {
-    const validDifficulties = [
-      "easy",
-      "medium",
-      "hard",
-    ];
-
-    if (
-      !validDifficulties.includes(difficulty)
-    ) {
-      return res.status(400).json({
-        message:
-          "difficulty must be easy, medium, or hard",
-      });
-    }
+  if (
+    difficulty !== undefined &&
+    !["easy", "medium", "hard"].includes(
+      difficulty
+    )
+  ) {
+    return res.status(400).json({
+      message:
+        "difficulty must be easy, medium, or hard",
+    });
   }
 
-  // Validate priority
-  if (priority !== undefined) {
-    const validPriorities = [
-      "low",
-      "medium",
-      "high",
-    ];
-
-    if (
-      !validPriorities.includes(priority)
-    ) {
-      return res.status(400).json({
-        message:
-          "priority must be low, medium, or high",
-      });
-    }
+  if (
+    priority !== undefined &&
+    !["low", "medium", "high"].includes(
+      priority
+    )
+  ) {
+    return res.status(400).json({
+      message:
+        "priority must be low, medium, or high",
+    });
   }
 
   try {
-    // Get existing task first so we can
-    // validate cross-field constraints.
     const existingTask =
       await getTaskById(id);
 
@@ -410,12 +351,6 @@ app.put("/api/tasks/:id", async (req, res) => {
         completed,
       });
 
-    if (!updatedTask) {
-      return res.status(404).json({
-        message: "Task not found",
-      });
-    }
-
     res.json(updatedTask);
   } catch (error) {
     console.error(
@@ -429,10 +364,7 @@ app.put("/api/tasks/:id", async (req, res) => {
   }
 });
 
-// ------------------------------------
 // DELETE TASK
-// ------------------------------------
-
 app.delete(
   "/api/tasks/:id",
   async (req, res) => {
@@ -472,42 +404,61 @@ app.delete(
 );
 
 // ==================================================
-// EXAM ROUTES - STILL IN MEMORY
+// EXAM ROUTES - POSTGRESQL
 // ==================================================
 
-// ------------------------------------
 // GET ALL EXAMS
-// ------------------------------------
+app.get("/api/exams", async (req, res) => {
+  try {
+    const exams = await getExams();
 
-app.get("/api/exams", (req, res) => {
-  res.json(exams);
+    res.json(exams);
+  } catch (error) {
+    console.error(
+      "GET /api/exams error:",
+      error
+    );
+
+    res.status(500).json({
+      message: "Could not fetch exams",
+    });
+  }
 });
 
-// ------------------------------------
 // GET SINGLE EXAM
-// ------------------------------------
-
-app.get("/api/exams/:id", (req, res) => {
+app.get("/api/exams/:id", async (req, res) => {
   const id = Number(req.params.id);
 
-  const exam = exams.find(
-    (exam) => exam.id === id
-  );
-
-  if (!exam) {
-    return res.status(404).json({
-      message: "Exam not found",
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({
+      message: "Invalid exam id",
     });
   }
 
-  res.json(exam);
+  try {
+    const exam = await getExamById(id);
+
+    if (!exam) {
+      return res.status(404).json({
+        message: "Exam not found",
+      });
+    }
+
+    res.json(exam);
+  } catch (error) {
+    console.error(
+      "GET /api/exams/:id error:",
+      error
+    );
+
+    res.status(500).json({
+      message: "Could not fetch exam",
+    });
+  }
 });
 
-// ------------------------------------
-// CREATE NEW EXAM
-// ------------------------------------
-
-app.post("/api/exams", (req, res) => {
+// CREATE EXAM
+app.post("/api/exams", async (req, res) => {
   const {
     subject,
     examDate,
@@ -537,63 +488,54 @@ app.post("/api/exams", (req, res) => {
     });
   }
 
-  const newExam = {
-    id:
-      exams.length > 0
-        ? Math.max(
-            ...exams.map(
-              (exam) => exam.id
-            )
-          ) + 1
-        : 1,
+  try {
+    const exam = await createExam({
+      subject: subject.trim(),
+      examDate,
+    });
 
-    subject: subject.trim(),
-    examDate,
-  };
+    res.status(201).json(exam);
+  } catch (error) {
+    console.error(
+      "POST /api/exams error:",
+      error
+    );
 
-  exams.push(newExam);
-
-  res.status(201).json(newExam);
+    res.status(500).json({
+      message: "Could not create exam",
+    });
+  }
 });
 
-// ------------------------------------
 // UPDATE EXAM
-// ------------------------------------
-
-app.put("/api/exams/:id", (req, res) => {
+app.put("/api/exams/:id", async (req, res) => {
   const id = Number(req.params.id);
 
-  const exam = exams.find(
-    (exam) => exam.id === id
-  );
-
-  if (!exam) {
-    return res.status(404).json({
-      message: "Exam not found",
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({
+      message: "Invalid exam id",
     });
   }
 
-  if (req.body.subject !== undefined) {
+  const {
+    subject,
+    examDate,
+  } = req.body;
+
+  if (subject !== undefined) {
     if (
-      typeof req.body.subject !== "string" ||
-      !req.body.subject.trim()
+      typeof subject !== "string" ||
+      !subject.trim()
     ) {
       return res.status(400).json({
         message:
           "Subject cannot be empty",
       });
     }
-
-    exam.subject =
-      req.body.subject.trim();
   }
 
-  if (
-    req.body.examDate !== undefined
-  ) {
-    const date = new Date(
-      req.body.examDate
-    );
+  if (examDate !== undefined) {
+    const date = new Date(examDate);
 
     if (Number.isNaN(date.getTime())) {
       return res.status(400).json({
@@ -601,40 +543,75 @@ app.put("/api/exams/:id", (req, res) => {
           "Invalid exam date",
       });
     }
-
-    exam.examDate =
-      req.body.examDate;
   }
 
-  res.json(exam);
-});
+  try {
+    const updatedExam =
+      await updateExam(id, {
+        subject:
+          subject !== undefined
+            ? subject.trim()
+            : undefined,
+        examDate,
+      });
 
-// ------------------------------------
-// DELETE EXAM
-// ------------------------------------
+    if (!updatedExam) {
+      return res.status(404).json({
+        message: "Exam not found",
+      });
+    }
 
-app.delete("/api/exams/:id", (req, res) => {
-  const id = Number(req.params.id);
+    res.json(updatedExam);
+  } catch (error) {
+    console.error(
+      "PUT /api/exams/:id error:",
+      error
+    );
 
-  const examExists = exams.some(
-    (exam) => exam.id === id
-  );
-
-  if (!examExists) {
-    return res.status(404).json({
-      message: "Exam not found",
+    res.status(500).json({
+      message: "Could not update exam",
     });
   }
-
-  exams = exams.filter(
-    (exam) => exam.id !== id
-  );
-
-  res.json({
-    message:
-      "Exam deleted successfully",
-  });
 });
+
+// DELETE EXAM
+app.delete(
+  "/api/exams/:id",
+  async (req, res) => {
+    const id = Number(req.params.id);
+
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({
+        message: "Invalid exam id",
+      });
+    }
+
+    try {
+      const deleted =
+        await deleteExam(id);
+
+      if (!deleted) {
+        return res.status(404).json({
+          message: "Exam not found",
+        });
+      }
+
+      res.json({
+        message:
+          "Exam deleted successfully",
+      });
+    } catch (error) {
+      console.error(
+        "DELETE /api/exams/:id error:",
+        error
+      );
+
+      res.status(500).json({
+        message: "Could not delete exam",
+      });
+    }
+  }
+);
 
 // ==================================================
 // STUDY PLAN ROUTE
@@ -656,10 +633,9 @@ app.post("/api/study-plan", async (req, res) => {
   }
 
   try {
-    // Get live tasks from PostgreSQL.
     const tasks = await getTasks();
+    const exams = await getExams();
 
-    // Exams are still in memory for now.
     const studyPlan =
       generateStudyPlan(
         tasks,

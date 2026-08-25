@@ -355,7 +355,7 @@ async function getExams() {
     SELECT
       id,
       subject,
-      exam_date
+      TO_CHAR(exam_date, 'YYYY-MM-DD') AS exam_date
     FROM exams
     WHERE user_id = $1
     ORDER BY exam_date ASC, id ASC
@@ -382,7 +382,7 @@ async function getExamById(id) {
     SELECT
       id,
       subject,
-      exam_date
+      TO_CHAR(exam_date, 'YYYY-MM-DD') AS exam_date
     FROM exams
     WHERE id = $1
       AND user_id = $2
@@ -425,7 +425,7 @@ async function createExam({
     RETURNING
       id,
       subject,
-      exam_date
+      TO_CHAR(exam_date, 'YYYY-MM-DD') AS exam_date
     `,
     [
       user.id,
@@ -447,10 +447,7 @@ async function createExam({
 // UPDATE EXAM
 // ------------------------------------
 
-async function updateExam(
-  id,
-  updates
-) {
+async function updateExam(id, updates) {
   const user = await getDevelopmentUser();
 
   const existingExam =
@@ -481,7 +478,7 @@ async function updateExam(
     RETURNING
       id,
       subject,
-      exam_date
+      TO_CHAR(exam_date, 'YYYY-MM-DD') AS exam_date
     `,
     [
       subject,
@@ -523,7 +520,6 @@ async function deleteExam(id) {
 
   return result.rows.length > 0;
 }
-
 module.exports = {
   getDevelopmentUser,
 
