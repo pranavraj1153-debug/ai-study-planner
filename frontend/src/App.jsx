@@ -3,6 +3,8 @@ import "./App.css";
 
 const TASKS_API_URL = "http://localhost:5000/api/tasks";
 const EXAMS_API_URL = "http://localhost:5000/api/exams";
+const STUDY_SESSIONS_API_URL =
+  "http://localhost:5000/api/study-sessions";
 
 function App() {
   // ==================================================
@@ -10,18 +12,25 @@ function App() {
   // ==================================================
 
   const [tasks, setTasks] = useState([]);
-  const [loadingTasks, setLoadingTasks] = useState(true);
+  const [loadingTasks, setLoadingTasks] =
+    useState(true);
 
   // ==================================================
   // EXAM STATE
   // ==================================================
 
   const [exams, setExams] = useState([]);
-  const [loadingExams, setLoadingExams] = useState(true);
+  const [loadingExams, setLoadingExams] =
+    useState(true);
 
-  const [examSubject, setExamSubject] = useState("");
-  const [examDate, setExamDate] = useState("");
-  const [addingExam, setAddingExam] = useState(false);
+  const [examSubject, setExamSubject] =
+    useState("");
+
+  const [examDate, setExamDate] =
+    useState("");
+
+  const [addingExam, setAddingExam] =
+    useState(false);
 
   // ==================================================
   // GENERAL ERROR STATE
@@ -33,9 +42,14 @@ function App() {
   // TASK FORM STATE
   // ==================================================
 
-  const [subject, setSubject] = useState("");
-  const [time, setTime] = useState("");
-  const [addingTask, setAddingTask] = useState(false);
+  const [subject, setSubject] =
+    useState("");
+
+  const [time, setTime] =
+    useState("");
+
+  const [addingTask, setAddingTask] =
+    useState(false);
 
   // ==================================================
   // LOAD TASKS
@@ -44,13 +58,19 @@ function App() {
   useEffect(() => {
     const fetchTasks = async () => {
       try {
-        const response = await fetch(TASKS_API_URL);
+        const response = await fetch(
+          TASKS_API_URL
+        );
 
         if (!response.ok) {
-          throw new Error("Failed to load tasks");
+          throw new Error(
+            "Failed to load tasks"
+          );
         }
 
-        const data = await response.json();
+        const data =
+          await response.json();
+
         setTasks(data);
       } catch (err) {
         console.error(err);
@@ -73,13 +93,19 @@ function App() {
   useEffect(() => {
     const fetchExams = async () => {
       try {
-        const response = await fetch(EXAMS_API_URL);
+        const response = await fetch(
+          EXAMS_API_URL
+        );
 
         if (!response.ok) {
-          throw new Error("Failed to load exams");
+          throw new Error(
+            "Failed to load exams"
+          );
         }
 
-        const data = await response.json();
+        const data =
+          await response.json();
+
         setExams(data);
       } catch (err) {
         console.error(err);
@@ -99,7 +125,9 @@ function App() {
   // CALCULATE DAYS UNTIL EXAM
   // ==================================================
 
-  const getDaysUntilExam = (examDateValue) => {
+  const getDaysUntilExam = (
+    examDateValue
+  ) => {
     const today = new Date();
 
     today.setHours(0, 0, 0, 0);
@@ -111,10 +139,12 @@ function App() {
     exam.setHours(0, 0, 0, 0);
 
     const difference =
-      exam.getTime() - today.getTime();
+      exam.getTime() -
+      today.getTime();
 
     const days = Math.ceil(
-      difference / (1000 * 60 * 60 * 24)
+      difference /
+        (1000 * 60 * 60 * 24)
     );
 
     if (days < 0) {
@@ -143,7 +173,9 @@ function App() {
 
     if (!task) return;
 
-    const oldCompleted = task.completed;
+    const oldCompleted =
+      task.completed;
+
     const oldCompletedMinutes =
       task.completedMinutes;
 
@@ -161,7 +193,8 @@ function App() {
         task.id === id
           ? {
               ...task,
-              completed: updatedCompleted,
+              completed:
+                updatedCompleted,
               completedMinutes:
                 updatedCompletedMinutes,
             }
@@ -175,10 +208,12 @@ function App() {
         {
           method: "PUT",
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type":
+              "application/json",
           },
           body: JSON.stringify({
-            completed: updatedCompleted,
+            completed:
+              updatedCompleted,
             completedMinutes:
               updatedCompletedMinutes,
           }),
@@ -206,13 +241,14 @@ function App() {
     } catch (err) {
       console.error(err);
 
-      // Restore old state
+      // Restore previous state
       setTasks((currentTasks) =>
         currentTasks.map((task) =>
           task.id === id
             ? {
                 ...task,
-                completed: oldCompleted,
+                completed:
+                  oldCompleted,
                 completedMinutes:
                   oldCompletedMinutes,
               }
@@ -257,10 +293,12 @@ function App() {
         {
           method: "POST",
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type":
+              "application/json",
           },
           body: JSON.stringify({
-            subject: subject.trim(),
+            subject:
+              subject.trim(),
             time: time.trim(),
           }),
         }
@@ -340,6 +378,97 @@ function App() {
   };
 
   // ==================================================
+  // RECORD STUDY SESSION
+  // ==================================================
+
+  const recordStudySession = async (
+    taskId,
+    minutes
+  ) => {
+    const task = tasks.find(
+      (task) => task.id === taskId
+    );
+
+    if (!task) return;
+
+    const remainingMinutes =
+      task.estimatedMinutes -
+      task.completedMinutes;
+
+    if (remainingMinutes <= 0) {
+      setError(
+        "This task is already completed."
+      );
+
+      return;
+    }
+
+    // Never allow a session to exceed
+    // the remaining task time.
+    const sessionMinutes = Math.min(
+      minutes,
+      remainingMinutes
+    );
+
+    try {
+      const response = await fetch(
+        STUDY_SESSIONS_API_URL,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            taskId,
+            minutes:
+              sessionMinutes,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData =
+          await response
+            .json()
+            .catch(() => null);
+
+        throw new Error(
+          errorData?.message ||
+            "Failed to record study session"
+        );
+      }
+
+      // Reload tasks from PostgreSQL.
+      const tasksResponse =
+        await fetch(TASKS_API_URL);
+
+      if (!tasksResponse.ok) {
+        throw new Error(
+          "Failed to refresh tasks"
+        );
+      }
+
+      const updatedTasks =
+        await tasksResponse.json();
+
+      setTasks(updatedTasks);
+      setError("");
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        err.message ||
+          "Could not record study session."
+      );
+
+      setTimeout(() => {
+        setError("");
+      }, 3000);
+    }
+  };
+
+  // ==================================================
   // ADD EXAM
   // ==================================================
 
@@ -366,10 +495,12 @@ function App() {
         {
           method: "POST",
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type":
+              "application/json",
           },
           body: JSON.stringify({
-            subject: examSubject.trim(),
+            subject:
+              examSubject.trim(),
             examDate,
           }),
         }
@@ -377,9 +508,9 @@ function App() {
 
       if (!response.ok) {
         const errorData =
-          await response.json().catch(
-            () => null
-          );
+          await response
+            .json()
+            .catch(() => null);
 
         throw new Error(
           errorData?.message ||
@@ -390,14 +521,16 @@ function App() {
       const newExam =
         await response.json();
 
-      setExams((currentExams) => [
-        ...currentExams,
-        newExam,
-      ].sort((a, b) =>
-        a.examDate.localeCompare(
-          b.examDate
+      setExams((currentExams) =>
+        [
+          ...currentExams,
+          newExam,
+        ].sort((a, b) =>
+          a.examDate.localeCompare(
+            b.examDate
+          )
         )
-      ));
+      );
 
       setExamSubject("");
       setExamDate("");
@@ -435,9 +568,9 @@ function App() {
 
       if (!response.ok) {
         const errorData =
-          await response.json().catch(
-            () => null
-          );
+          await response
+            .json()
+            .catch(() => null);
 
         throw new Error(
           errorData?.message ||
@@ -496,7 +629,9 @@ function App() {
 
       {/* Header */}
       <header className="header">
-        <h1>AI Study Planner</h1>
+        <h1>
+          AI Study Planner
+        </h1>
 
         <nav>
           <a href="#">
@@ -532,7 +667,8 @@ function App() {
             style={{
               background: "#fee2e2",
               color: "#991b1b",
-              padding: "12px 16px",
+              padding:
+                "12px 16px",
               borderRadius: "8px",
               marginBottom: "20px",
             }}
@@ -590,14 +726,18 @@ function App() {
           <form
             onSubmit={addTask}
             style={{
-              display: "flex",
+              display:
+                "flex",
               gap: "10px",
-              flexWrap: "wrap",
-              marginBottom: "25px",
+              flexWrap:
+                "wrap",
+              marginBottom:
+                "25px",
               padding: "20px",
               background:
                 "#f8fafc",
-              borderRadius: "12px",
+              borderRadius:
+                "12px",
             }}
           >
             <input
@@ -611,12 +751,16 @@ function App() {
               }
               style={{
                 flex: "1",
-                minWidth: "180px",
-                padding: "12px",
+                minWidth:
+                  "180px",
+                padding:
+                  "12px",
                 border:
                   "1px solid #d1d5db",
-                borderRadius: "8px",
-                fontSize: "15px",
+                borderRadius:
+                  "8px",
+                fontSize:
+                  "15px",
               }}
             />
 
@@ -631,12 +775,16 @@ function App() {
               }
               style={{
                 flex: "1",
-                minWidth: "180px",
-                padding: "12px",
+                minWidth:
+                  "180px",
+                padding:
+                  "12px",
                 border:
                   "1px solid #d1d5db",
-                borderRadius: "8px",
-                fontSize: "15px",
+                borderRadius:
+                  "8px",
+                fontSize:
+                  "15px",
               }}
             />
 
@@ -648,13 +796,18 @@ function App() {
                   "12px 20px",
                 background:
                   "#2563eb",
-                color: "white",
-                border: "none",
-                borderRadius: "8px",
-                cursor: addingTask
-                  ? "not-allowed"
-                  : "pointer",
-                fontWeight: "600",
+                color:
+                  "white",
+                border:
+                  "none",
+                borderRadius:
+                  "8px",
+                cursor:
+                  addingTask
+                    ? "not-allowed"
+                    : "pointer",
+                fontWeight:
+                  "600",
               }}
             >
               {addingTask
@@ -663,7 +816,10 @@ function App() {
             </button>
           </form>
 
-          {/* Task List */}
+          {/* ==================================================
+              TASK LIST
+          ================================================== */}
+
           {loadingTasks ? (
             <p>
               Loading tasks...
@@ -673,65 +829,212 @@ function App() {
               No tasks available.
             </p>
           ) : (
-            tasks.map((task) => (
-              <div
-                className="task"
-                key={task.id}
-              >
-                <input
-                  type="checkbox"
-                  checked={
-                    task.completed
-                  }
-                  onChange={() =>
-                    toggleTask(
-                      task.id
-                    )
-                  }
-                />
+            tasks.map((task) => {
+              const remainingMinutes =
+                Math.max(
+                  task.estimatedMinutes -
+                    task.completedMinutes,
+                  0
+                );
 
-                <span
+              return (
+                <div
+                  className="task"
+                  key={task.id}
                   style={{
-                    textDecoration:
-                      task.completed
-                        ? "line-through"
-                        : "none",
-                    opacity:
-                      task.completed
-                        ? 0.5
-                        : 1,
+                    display: "grid",
+                    gridTemplateColumns:
+                      "40px minmax(0, 1fr) auto",
+                    gap: "16px",
+                    alignItems:
+                      "center",
+                    padding:
+                      "18px 10px",
                   }}
                 >
-                  {task.subject}
-                </span>
+                  {/* Checkbox */}
+                  <input
+                    type="checkbox"
+                    checked={
+                      task.completed
+                    }
+                    onChange={() =>
+                      toggleTask(
+                        task.id
+                      )
+                    }
+                    style={{
+                      width: "20px",
+                      height: "20px",
+                    }}
+                  />
 
-                <small>
-                  {task.time}
-                </small>
+                  {/* Main task information */}
+                  <div
+                    style={{
+                      display:
+                        "flex",
+                      flexDirection:
+                        "column",
+                      gap: "5px",
+                      minWidth: 0,
+                    }}
+                  >
+                    {/* Subject */}
+                    <span
+                      style={{
+                        fontSize:
+                          "18px",
+                        fontWeight:
+                          "500",
+                        textDecoration:
+                          task.completed
+                            ? "line-through"
+                            : "none",
+                        opacity:
+                          task.completed
+                            ? 0.5
+                            : 1,
+                      }}
+                    >
+                      {task.subject}
+                    </span>
 
-                <button
-                  onClick={() =>
-                    deleteTask(
-                      task.id
-                    )
-                  }
-                  title="Delete task"
-                  style={{
-                    marginLeft:
-                      "15px",
-                    border: "none",
-                    background:
-                      "transparent",
-                    cursor:
-                      "pointer",
-                    fontSize:
-                      "20px",
-                  }}
-                >
-                  🗑️
-                </button>
-              </div>
-            ))
+                    {/* Scheduled time */}
+                    <small
+                      style={{
+                        color:
+                          "#6b7280",
+                      }}
+                    >
+                      {task.time}
+                    </small>
+
+                    {/* Progress */}
+                    <div
+                      style={{
+                        marginTop:
+                          "6px",
+                        display:
+                          "flex",
+                        flexDirection:
+                          "column",
+                        gap: "3px",
+                      }}
+                    >
+                      <small>
+                        Progress:{" "}
+                        {
+                          task.completedMinutes
+                        }{" "}
+                        /{" "}
+                        {
+                          task.estimatedMinutes
+                        }{" "}
+                        min
+                      </small>
+
+                      {!task.completed ? (
+                        <small
+                          style={{
+                            color:
+                              "#6b7280",
+                          }}
+                        >
+                          {
+                            remainingMinutes
+                          }{" "}
+                          min remaining
+                        </small>
+                      ) : (
+                        <small
+                          style={{
+                            color:
+                              "#16a34a",
+                            fontWeight:
+                              "600",
+                          }}
+                        >
+                          Completed ✅
+                        </small>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div
+                    style={{
+                      display:
+                        "flex",
+                      alignItems:
+                        "center",
+                      gap: "12px",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {/* Study session */}
+                    {!task.completed && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          recordStudySession(
+                            task.id,
+                            15
+                          )
+                        }
+                        style={{
+                          padding:
+                            "9px 14px",
+                          border:
+                            "1px solid #2563eb",
+                          background:
+                            "#eff6ff",
+                          color:
+                            "#1d4ed8",
+                          borderRadius:
+                            "7px",
+                          cursor:
+                            "pointer",
+                          fontSize:
+                            "14px",
+                          fontWeight:
+                            "600",
+                          whiteSpace:
+                            "nowrap",
+                        }}
+                      >
+                        +15 min
+                      </button>
+                    )}
+
+                    {/* Delete */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        deleteTask(
+                          task.id
+                        )
+                      }
+                      title="Delete task"
+                      style={{
+                        border:
+                          "none",
+                        background:
+                          "transparent",
+                        cursor:
+                          "pointer",
+                        fontSize:
+                          "20px",
+                        padding:
+                          "4px",
+                      }}
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+              );
+            })
           )}
 
         </section>
@@ -750,14 +1053,19 @@ function App() {
           <form
             onSubmit={addExam}
             style={{
-              display: "flex",
+              display:
+                "flex",
               gap: "10px",
-              flexWrap: "wrap",
-              marginBottom: "25px",
-              padding: "20px",
+              flexWrap:
+                "wrap",
+              marginBottom:
+                "25px",
+              padding:
+                "20px",
               background:
                 "#f8fafc",
-              borderRadius: "12px",
+              borderRadius:
+                "12px",
             }}
           >
             <input
@@ -771,12 +1079,16 @@ function App() {
               }
               style={{
                 flex: "1",
-                minWidth: "180px",
-                padding: "12px",
+                minWidth:
+                  "180px",
+                padding:
+                  "12px",
                 border:
                   "1px solid #d1d5db",
-                borderRadius: "8px",
-                fontSize: "15px",
+                borderRadius:
+                  "8px",
+                fontSize:
+                  "15px",
               }}
             />
 
@@ -790,12 +1102,16 @@ function App() {
               }
               style={{
                 flex: "1",
-                minWidth: "180px",
-                padding: "12px",
+                minWidth:
+                  "180px",
+                padding:
+                  "12px",
                 border:
                   "1px solid #d1d5db",
-                borderRadius: "8px",
-                fontSize: "15px",
+                borderRadius:
+                  "8px",
+                fontSize:
+                  "15px",
               }}
             />
 
@@ -807,13 +1123,18 @@ function App() {
                   "12px 20px",
                 background:
                   "#2563eb",
-                color: "white",
-                border: "none",
-                borderRadius: "8px",
-                cursor: addingExam
-                  ? "not-allowed"
-                  : "pointer",
-                fontWeight: "600",
+                color:
+                  "white",
+                border:
+                  "none",
+                borderRadius:
+                  "8px",
+                cursor:
+                  addingExam
+                    ? "not-allowed"
+                    : "pointer",
+                fontWeight:
+                  "600",
               }}
             >
               {addingExam
@@ -864,6 +1185,7 @@ function App() {
                 </strong>
 
                 <button
+                  type="button"
                   onClick={() =>
                     deleteExam(
                       exam.id
@@ -873,7 +1195,8 @@ function App() {
                   style={{
                     marginLeft:
                       "15px",
-                    border: "none",
+                    border:
+                      "none",
                     background:
                       "transparent",
                     cursor:
