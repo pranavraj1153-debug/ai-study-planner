@@ -19,6 +19,9 @@ const {
   createExam,
   updateExam,
   deleteExam,
+
+  createStudySession,
+  getStudySessions,
 } = require("./db/queries");
 
 const app = express();
@@ -612,7 +615,141 @@ app.delete(
     }
   }
 );
+// ==================================================
+// STUDY SESSION ROUTES
+// ==================================================
 
+// ------------------------------------
+// GET ALL STUDY SESSIONS
+// ------------------------------------
+
+app.get(
+  "/api/study-sessions",
+  async (req, res) => {
+    try {
+      const sessions =
+        await getStudySessions();
+
+      res.json(sessions);
+    } catch (error) {
+      console.error(
+        "GET /api/study-sessions error:",
+        error
+      );
+
+      res.status(500).json({
+        message:
+          "Could not fetch study sessions",
+      });
+    }
+  }
+);
+
+// ------------------------------------
+// CREATE STUDY SESSION
+// ------------------------------------
+
+app.post(
+  "/api/study-sessions",
+  async (req, res) => {
+    const {
+      taskId,
+      minutes,
+      sessionDate,
+    } = req.body;
+
+    const numericTaskId =
+      Number(taskId);
+
+    const numericMinutes =
+      Number(minutes);
+
+    // Validate task ID
+    if (
+      !Number.isInteger(
+        numericTaskId
+      ) ||
+      numericTaskId <= 0
+    ) {
+      return res.status(400).json({
+        message:
+          "taskId must be a positive whole number",
+      });
+    }
+
+    // Validate minutes
+    if (
+      !Number.isInteger(
+        numericMinutes
+      ) ||
+      numericMinutes <= 0
+    ) {
+      return res.status(400).json({
+        message:
+          "minutes must be a positive whole number",
+      });
+    }
+
+    // Validate optional date
+    if (sessionDate !== undefined) {
+      const date = new Date(
+        `${sessionDate}T00:00:00`
+      );
+
+      if (
+        Number.isNaN(
+          date.getTime()
+        )
+      ) {
+        return res.status(400).json({
+          message:
+            "Invalid session date",
+        });
+      }
+    }
+
+    try {
+      const session =
+        await createStudySession({
+          taskId: numericTaskId,
+          minutes: numericMinutes,
+          sessionDate:
+            sessionDate || null,
+        });
+
+      res.status(201).json(session);
+    } catch (error) {
+      console.error(
+        "POST /api/study-sessions error:",
+        error
+      );
+
+      if (
+        error.message ===
+        "Task not found"
+      ) {
+        return res.status(404).json({
+          message: "Task not found",
+        });
+      }
+
+      if (
+        error.message.includes(
+          "cannot exceed remaining task time"
+        )
+      ) {
+        return res.status(400).json({
+          message: error.message,
+        });
+      }
+
+      res.status(500).json({
+        message:
+          "Could not create study session",
+      });
+    }
+  }
+);
 // ==================================================
 // STUDY PLAN ROUTE
 // ==================================================
