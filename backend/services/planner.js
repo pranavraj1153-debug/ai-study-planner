@@ -3,13 +3,22 @@
  * and an exam date.
  */
 function getDaysUntilExam(examDate) {
+  if (!examDate) {
+    return null;
+  }
+
   const today = new Date();
   const exam = new Date(examDate);
+
+  if (Number.isNaN(exam.getTime())) {
+    return null;
+  }
 
   today.setHours(0, 0, 0, 0);
   exam.setHours(0, 0, 0, 0);
 
-  const difference = exam.getTime() - today.getTime();
+  const difference =
+    exam.getTime() - today.getTime();
 
   return Math.ceil(
     difference / (1000 * 60 * 60 * 24)
@@ -61,15 +70,22 @@ function getPriorityScore(priority) {
  * Calculate exam urgency.
  *
  * Closer exam = higher score.
+ *
+ * Tasks without an exam receive a small
+ * baseline urgency score so they remain
+ * schedulable without dominating exam-driven work.
  */
 function getExamUrgencyScore(exam) {
   if (!exam) {
     return 10;
   }
 
-  const daysUntilExam = getDaysUntilExam(
-    exam.examDate
-  );
+  const daysUntilExam =
+    getDaysUntilExam(exam.examDate);
+
+  if (daysUntilExam === null) {
+    return 10;
+  }
 
   if (daysUntilExam < 0) {
     return 5;
@@ -111,10 +127,14 @@ function calculatePriority(task, exams) {
     getExamUrgencyScore(exam);
 
   const difficultyScore =
-    getDifficultyScore(task.difficulty);
+    getDifficultyScore(
+      task.difficulty
+    );
 
   const priorityScore =
-    getPriorityScore(task.priority);
+    getPriorityScore(
+      task.priority
+    );
 
   return (
     examScore +
@@ -140,7 +160,8 @@ function getRemainingMinutes(task) {
     Number(task.completedMinutes) || 0;
 
   return Math.max(
-    estimatedMinutes - completedMinutes,
+    estimatedMinutes -
+      completedMinutes,
     0
   );
 }
@@ -176,44 +197,82 @@ function generateStudyPlan(
   }
 
   // Only unfinished tasks should be considered.
-  const incompleteTasks = tasks.filter(
-    (task) => !task.completed
-  );
+  const incompleteTasks =
+    tasks.filter(
+      (task) => !task.completed
+    );
 
   // Add priority and remaining-work information.
   const prioritizedTasks =
-    incompleteTasks.map((task) => {
-      const exam =
-        findExamForSubject(
-          task.subject,
-          exams
-        );
-
-      return {
-        ...task,
-
-        priorityScore:
-          calculatePriority(
-            task,
+    incompleteTasks
+      .map((task) => {
+        const exam =
+          findExamForSubject(
+            task.subject,
             exams
-          ),
+          );
 
-        remainingMinutes:
-          getRemainingMinutes(task),
+        return {
+          ...task,
 
-        daysUntilExam: exam
-          ? getDaysUntilExam(
-              exam.examDate
-            )
-          : null,
-      };
-    });
+          priorityScore:
+            calculatePriority(
+              task,
+              exams
+            ),
 
-  // Highest priority first.
+          remainingMinutes:
+            getRemainingMinutes(
+              task
+            ),
+
+          daysUntilExam: exam
+            ? getDaysUntilExam(
+                exam.examDate
+              )
+            : null,
+        };
+      })
+      .filter(
+        (task) =>
+          task.remainingMinutes > 0
+      );
+
+  /*
+   * Highest priority first.
+   *
+   * If two tasks have the same score,
+   * schedule the task with less remaining
+   * work first. If those are also equal,
+   * use the task ID for deterministic ordering.
+   */
   prioritizedTasks.sort(
-    (a, b) =>
-      b.priorityScore -
-      a.priorityScore
+    (a, b) => {
+      if (
+        b.priorityScore !==
+        a.priorityScore
+      ) {
+        return (
+          b.priorityScore -
+          a.priorityScore
+        );
+      }
+
+      if (
+        a.remainingMinutes !==
+        b.remainingMinutes
+      ) {
+        return (
+          a.remainingMinutes -
+          b.remainingMinutes
+        );
+      }
+
+      return (
+        Number(a.id) -
+        Number(b.id)
+      );
+    }
   );
 
   // Convert hours into minutes.
@@ -234,11 +293,6 @@ function generateStudyPlan(
       break;
     }
 
-    // No remaining work = nothing to schedule.
-    if (task.remainingMinutes <= 0) {
-      continue;
-    }
-
     const allocatedMinutes =
       Math.min(
         task.remainingMinutes,
@@ -248,7 +302,8 @@ function generateStudyPlan(
     studyPlan.push({
       taskId: task.id,
       subject: task.subject,
-      timeMinutes: allocatedMinutes,
+      timeMinutes:
+        allocatedMinutes,
       remainingMinutes:
         task.remainingMinutes,
       priorityScore:
